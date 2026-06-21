@@ -1,6 +1,6 @@
 # CivicMind
 
-**Case-based reasoning for civic incident prediction in Mumbai.**
+**Case-based reasoning for civic incident prediction in a city.**
 
 CivicMind is a memory-augmented decision support system for urban civic management. Given a situation description (weather, time, active conditions, ongoing events), it retrieves similar past incidents from a semantic memory store, traverses a causal-temporal knowledge graph to predict likely next events, and recommends interventions with full citation trails.
 
