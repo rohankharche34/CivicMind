@@ -50,26 +50,19 @@ class CivicMindInference:
 
     def __init__(self, k_matches: int = 20):
         self.k_matches = k_matches
-
         self.dataset_dir = os.path.join(PROJECT_ROOT, "dataset")
-
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
-        self.index = faiss.read_index(
-            os.path.join(self.dataset_dir, "civicmind_memory.index")
-        )
-        self.df = pd.read_pickle(
-            os.path.join(self.dataset_dir, "episode_lookup.pkl")
-        )
-        self.graph = nx.read_graphml(
-            os.path.join(self.dataset_dir, "civicmind_graph.graphml")
-        )
+        self._model = None
+        self._index = None
+        self._df = None
+        self._graph = None
+        self._graph_cache = None
 
         self._build_graph_cache()
         self.episode_hits = defaultdict(int)
         self.global_counter = 0
         self.importance = defaultdict(float)
         self.pruned_episodes = set()
-        
+
         state_path = os.path.join(self.dataset_dir, "learning_state.json")
         if os.path.exists(state_path):
             with open(state_path) as f:
@@ -81,10 +74,47 @@ class CivicMindInference:
 
         self.alpha = 0.01
 
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = SentenceTransformer(
+                "all-MiniLM-L6-v2",
+                backend="onnx",
+                model_kwargs={"file_name": "model.onnx"},
+            )
+        return self._model
+
+    @property
+    def index(self):
+        if self._index is None:
+            self._index = faiss.read_index(
+                os.path.join(self.dataset_dir, "civicmind_memory.index")
+            )
+        return self._index
+
+    @property
+    def df(self):
+        if self._df is None:
+            self._df = pd.read_pickle(
+                os.path.join(self.dataset_dir, "episode_lookup.pkl")
+            )
+        return self._df
+
+    @property
+    def graph(self):
+        if self._graph is None:
+            self._graph = nx.read_graphml(
+                os.path.join(self.dataset_dir, "civicmind_graph.graphml")
+            )
+            self._build_graph_cache()
+        return self._graph
+
     def _build_graph_cache(self):
         self._concept_out = defaultdict(list)
         self._preceded_out = defaultdict(list)
-        for u, v, d in self.graph.edges(data=True):
+        if self._graph is None:
+            return
+        for u, v, d in self._graph.edges(data=True):
             etype = d.get("edge_type")
             if etype == "CONCEPT":
                 self._concept_out[u].append((v, d.get("weight", 1)))
