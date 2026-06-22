@@ -8,3 +8,5 @@ __pycache__/*
 
 # runtime learning state — delete to reset
 dataset/learning_state.json
+
+.env

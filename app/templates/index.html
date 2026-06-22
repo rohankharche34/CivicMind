@@ -83,6 +83,14 @@
   .btn-predict:hover { opacity: 0.9; }
   .btn-predict:active { transform: scale(0.98); }
   .btn-predict:disabled { background: #334155; color: #64748b; cursor: not-allowed; transform: none; }
+  .btn-summarize {
+    padding: 8px 16px; background: linear-gradient(135deg, #f59e0b, #d97706);
+    border: none; border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600;
+    font-family: inherit; cursor: pointer; transition: opacity 0.2s;
+  }
+  .btn-summarize:hover { opacity: 0.85; }
+  .btn-summarize:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+  .summary-text { font-size: 14px; line-height: 1.7; color: #e2e8f0; }
   .error-box {
     background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
     color: #fca5a5; padding: 10px 14px; border-radius: 8px; font-size: 13px;
@@ -275,6 +283,8 @@
 </div>
 
 <script>
+let lastResult = null;
+
 async function runPrediction() {
   const btn = document.getElementById("predict-btn");
   const errorBox = document.getElementById("error-box");
@@ -314,6 +324,7 @@ async function runPrediction() {
       throw new Error(err.detail || "Prediction failed");
     }
     const data = await res.json();
+    lastResult = data;
     spinner.classList.remove("active");
     renderResults(data);
     content.style.display = "block";
@@ -335,6 +346,12 @@ function renderResults(data) {
   const maxSim = data.top_matches.length ? Math.max(...data.top_matches.map(m => m.similarity)) : 1;
 
   let html = '<div class="query-box fade-in">' + q + '</div>';
+
+  html += '<div class="section fade-in" id="summary-section">';
+  html += '<div class="section-header"><div class="section-dot" style="background:#f59e0b"></div><span class="section-title">AI Summary</span></div>';
+  html += '<div id="summary-content" style="font-size:14px;line-height:1.6;color:#cbd5e1;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px 20px;">';
+  html += '<button class="btn-summarize" onclick="generateSummary()">✨ Generate AI Summary</button>';
+  html += '</div></div>';
 
   if (data.top_matches.length) {
     html += '<div class="section fade-in">';
@@ -397,6 +414,34 @@ function escapeHtml(t) {
   const d = document.createElement("div");
   d.textContent = t;
   return d.innerHTML;
+}
+
+async function generateSummary() {
+  const btn = document.querySelector(".btn-summarize");
+  const container = document.getElementById("summary-content");
+  btn.disabled = true;
+  btn.textContent = "⏳ Generating…";
+  container.innerHTML = '<div style="color:#94a3b8;font-size:13px">Generating AI summary…</div>';
+
+  try {
+    const res = await fetch("/summarize", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query_text: lastResult.query_text,
+        risk_scores: lastResult.risk_scores,
+        actions: lastResult.actions,
+        trace: lastResult.trace,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || "Summary failed");
+    }
+    const data = await res.json();
+    container.innerHTML = '<div class="summary-text">' + escapeHtml(data.summary) + '</div>';
+  } catch (e) {
+    container.innerHTML = '<div style="color:#fca5a5;font-size:13px">✕ ' + escapeHtml(e.message) + '</div>';
+  }
 }
 </script>
 </body>

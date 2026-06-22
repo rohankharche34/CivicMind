@@ -6,3 +6,5 @@ networkx
 numpy
 fastapi
 uvicorn
+google-genai
+python-dotenv
