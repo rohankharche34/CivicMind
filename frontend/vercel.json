@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/predict", "destination": "https://REPLACE_ME_WITH_YOUR_RENDER_URL.onrender.com/predict" },
-    { "source": "/summarize", "destination": "https://REPLACE_ME_WITH_YOUR_RENDER_URL.onrender.com/summarize" }
+    { "source": "/predict", "destination": "https://civicmind-itak.onrender.com/predict" },
+    { "source": "/summarize", "destination": "https://civicmind-itak.onrender.com/summarize" }
   ]
 }
