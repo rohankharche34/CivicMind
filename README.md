@@ -29,17 +29,25 @@ CivicMind is a memory-augmented decision support system for urban civic manageme
                     │index     │    │ 10K nodes    │
                     └───┬──────┘    │ 3.7K edges   │
                         │           └──────┬───────┘
-                        v                  v
-               ┌─────────────────────────────────┐
-               │      INFERENCE ENGINE            │
-               │      engine/inference.py         │
-               │                                  │
-               │  1. Encode situation → FAISS     │
-               │  2. Walk graph from matches      │
-               │  3. Compute triple-source risk    │
-               │  4. Rank actions with citations   │
-               │  5. Build reasoning trace         │
-               └─────────────────────────────────┘
+                         v                  v
+                ┌─────────────────────────────────┐
+                │      INFERENCE ENGINE            │
+                │      engine/inference.py         │
+                │                                  │
+                │  1. Encode situation → FAISS     │
+                │  2. Walk graph from matches      │
+                │  3. Compute triple-source risk    │
+                │  4. Rank actions with citations   │
+                │  5. Build reasoning trace         │
+                └──────────────┬──────────────────┘
+                               │
+                               v
+                ┌─────────────────────────────────┐
+                │      WEB DASHBOARD               │
+                │      app/main.py                 │
+                │      FastAPI + HTML/JS           │
+                │      http://localhost:8000       │
+                └─────────────────────────────────┘
 ```
 
 ### Three Memory Layers
@@ -65,7 +73,10 @@ CivicMind is a memory-augmented decision support system for urban civic manageme
 | `dataset/civicmind_graph.graphml` | 3.1 MB | NetworkX DiGraph (10,013 nodes, 3,701 edges) |
 | `scripts/transition_stats.py` | 85 | Temporal transition analysis (confidence, delay stats) |
 | `engine/inference.py` | 343 | Core inference engine with passive consolidation |
-| `requirements.txt` | 7 | Python dependencies |
+| `app/main.py` | 59 | FastAPI server: serves dashboard and /predict API |
+| `app/templates/index.html` | 403 | Dashboard UI: form, results, reasoning trace |
+| `app/static/civicmind-logo.svg` | 12 | CivicMind logo |
+| `requirements.txt` | 9 | Python dependencies |
 
 ---
 
@@ -100,6 +111,12 @@ python memory/build_graph.py
 python scripts/transition_stats.py
 ```
 Outputs transition confidence scores, support counts, average delays, and standard deviations between event types from the PRECEDED graph edges.
+
+### Launch the web dashboard
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+Open `http://localhost:8000` in a browser. The sidebar lets you configure a situation (timestamp, area, weather, conditions, event), and the results panel displays top matches, risk scores, recommended actions, and a reasoning trace.
 
 ### Run inference on a situation
 ```bash
@@ -199,6 +216,7 @@ Analyzed by `scripts/transition_stats.py` which computes transition confidence, 
 | Graph | NetworkX |
 | Data | pandas, numpy |
 | ML Backend | PyTorch (CUDA-capable) |
+| Dashboard | FastAPI, Uvicorn |
 
 ---
 
@@ -206,7 +224,7 @@ Analyzed by `scripts/transition_stats.py` which computes transition confidence, 
 
 Fully functional retrieval and inference pipeline. Next steps:
 
-- [ ] Web dashboard (Streamlit) for interactive situation input
+- [x] Web dashboard (FastAPI + HTML/JS) for interactive situation input
 - [ ] LLM summary layer on top of the reasoning trace
 - [x] Consolidation loop: increment retrieval_count, update confidence_score after each inference
 - [ ] Real city data integration
