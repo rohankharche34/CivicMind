@@ -1,11 +1,10 @@
 pandas
 faiss-cpu
-torch
-sentence-transformers
 networkx
 numpy
 fastapi
 uvicorn
 google-genai
 python-dotenv
-optimum[onnxruntime]
+onnxruntime
+tokenizers

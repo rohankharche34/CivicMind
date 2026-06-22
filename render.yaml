@@ -3,8 +3,10 @@ services:
     name: civicmind-backend
     runtime: python
     buildCommand: >
+      pip install torch sentence-transformers optimum optimum-onnx optimum[onnxruntime] onnx transformers &&
+      python scripts/export_onnx_model.py &&
       pip install -r requirements.txt &&
-      python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', backend='onnx', model_kwargs={'file_name': 'model.onnx'})"
+      pip uninstall -y torch sentence-transformers optimum optimum-onnx optimum[onnxruntime] onnx transformers 2>/dev/null || true
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GEMINI_API_KEY

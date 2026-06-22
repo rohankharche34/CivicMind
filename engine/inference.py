@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 import faiss
-from sentence_transformers import SentenceTransformer
+import onnxruntime
+from tokenizers import Tokenizer
 from collections import defaultdict
 import json
 
@@ -46,6 +47,38 @@ def _normalize_condition(cond: str) -> str:
     return _CONDITION_MAP.get(cond.replace(" ", "_").lower(), cond.title())
 
 
+class _ONNXEmbedder:
+    def __init__(self, model_path: str):
+        self.tokenizer = Tokenizer.from_file(
+            os.path.join(model_path, "tokenizer.json")
+        )
+        self.tokenizer.enable_padding(
+            pad_id=0, pad_token="[PAD]", length=128
+        )
+        self.tokenizer.enable_truncation(max_length=128)
+        self.session = onnxruntime.InferenceSession(
+            os.path.join(model_path, "model.onnx"),
+            providers=["CPUExecutionProvider"],
+        )
+
+    def encode(self, texts: list[str]) -> np.ndarray:
+        encoded = [self.tokenizer.encode(t) for t in texts]
+        input_ids = np.array([e.ids for e in encoded], dtype=np.int64)
+        attn_mask = np.array([e.attention_mask for e in encoded], dtype=np.int64)
+        tok_type = np.zeros_like(input_ids, dtype=np.int64)
+
+        outputs = self.session.run(None, {
+            "input_ids": input_ids,
+            "attention_mask": attn_mask,
+            "token_type_ids": tok_type,
+        })
+        emb = outputs[0]
+        attn = attn_mask[:, :, np.newaxis].astype(np.float32)
+        emb = np.sum(emb * attn, axis=1) / np.maximum(np.sum(attn, axis=1), 1e-9)
+        emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+        return emb.astype(np.float32)
+
+
 class CivicMindInference:
 
     def __init__(self, k_matches: int = 20):
@@ -77,11 +110,13 @@ class CivicMindInference:
     @property
     def model(self):
         if self._model is None:
-            self._model = SentenceTransformer(
-                "all-MiniLM-L6-v2",
-                backend="onnx",
-                model_kwargs={"file_name": "model.onnx"},
-            )
+            onnx_path = os.path.join(self.dataset_dir, "onnx-model")
+            if not os.path.exists(os.path.join(onnx_path, "model.onnx")):
+                raise RuntimeError(
+                    f"ONNX model not found at {onnx_path}. "
+                    "Run 'python scripts/export_onnx_model.py' first."
+                )
+            self._model = _ONNXEmbedder(onnx_path)
         return self._model
 
     @property
