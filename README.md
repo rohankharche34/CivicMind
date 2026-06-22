@@ -42,12 +42,20 @@ CivicMind is a memory-augmented decision support system for urban civic manageme
                 └──────────────┬──────────────────┘
                                │
                                v
-                ┌─────────────────────────────────┐
-                │      WEB DASHBOARD               │
-                │      app/main.py                 │
-                │      FastAPI + HTML/JS           │
-                │      http://localhost:8000       │
-                └─────────────────────────────────┘
+                 ┌─────────────────────────────────┐
+                 │      WEB DASHBOARD               │
+                 │      app/main.py                 │
+                 │      FastAPI + HTML/JS           │
+                 │      http://localhost:8000       │
+                 ├─────────────────────────────────┤
+                 │   POST /predict → inference     │
+                 │   POST /summarize → Gemini LLM  │
+                 └────────┬────────────┬───────────┘
+                          │            │
+              ┌───────────v─┐    ┌─────v──────────┐
+              │  Render     │    │  Vercel         │
+              │  (backend)  │    │  (frontend)     │
+              └─────────────┘    └─────────────────┘
 ```
 
 ### Three Memory Layers
@@ -73,10 +81,15 @@ CivicMind is a memory-augmented decision support system for urban civic manageme
 | `dataset/civicmind_graph.graphml` | 3.1 MB | NetworkX DiGraph (10,013 nodes, 3,701 edges) |
 | `scripts/transition_stats.py` | 85 | Temporal transition analysis (confidence, delay stats) |
 | `engine/inference.py` | 343 | Core inference engine with passive consolidation |
-| `app/main.py` | 59 | FastAPI server: serves dashboard and /predict API |
-| `app/templates/index.html` | 403 | Dashboard UI: form, results, reasoning trace |
+| `app/main.py` | 132 | FastAPI server: dashboard + /predict + /summarize APIs |
+| `app/templates/index.html` | 448 | Dashboard UI: form, results, AI summary, reasoning trace |
 | `app/static/civicmind-logo.svg` | 12 | CivicMind logo |
-| `requirements.txt` | 9 | Python dependencies |
+| `requirements.txt` | 10 | Python dependencies |
+| `frontend/index.html` | 448 | Standalone frontend for Vercel deployment |
+| `frontend/static/civicmind-logo.svg` | 12 | Logo for frontend deployment |
+| `frontend/vercel.json` | 6 | Vercel rewrites config (proxies API to Render) |
+| `render.yaml` | 9 | Render web service deployment config |
+| `.env.example` | 1 | Template for GEMINI_API_KEY |
 
 ---
 
@@ -88,6 +101,19 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+### API Key (for AI Summaries)
+
+The dashboard can generate LLM summaries of predictions using Google Gemini. To enable this:
+
+1. Get a free API key from https://aistudio.google.com/apikey
+2. Copy `.env.example` to `.env` and add your key:
+   ```bash
+   cp .env.example .env
+   ```
+   Then edit `.env` and set `GEMINI_API_KEY=your_key_here`.
+
+The `/summarize` endpoint is optional — the dashboard works without it.
 
 ---
 
@@ -116,7 +142,7 @@ Outputs transition confidence scores, support counts, average delays, and standa
 ```bash
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
-Open `http://localhost:8000` in a browser. The sidebar lets you configure a situation (timestamp, area, weather, conditions, event), and the results panel displays top matches, risk scores, recommended actions, and a reasoning trace.
+Open `http://localhost:8000` in a browser. The sidebar lets you configure a situation (timestamp, area, weather, conditions, event), and the results panel displays top matches, risk scores, recommended actions, and a reasoning trace. After a prediction, click **✨ Generate AI Summary** to get a natural-language overview (requires `GEMINI_API_KEY`).
 
 ### Run inference on a situation
 ```bash
@@ -206,6 +232,27 @@ Analyzed by `scripts/transition_stats.py` which computes transition confidence, 
 
 ---
 
+## Deployment
+
+The app is split into a static frontend (Vercel) and a Python backend (Render).
+
+### Render (Backend)
+
+1. Push the repo to GitHub
+2. Go to https://dashboard.render.com → New Web Service → connect your repo
+3. Render auto-detects `render.yaml`. Set the `GEMINI_API_KEY` environment variable in the dashboard.
+4. Deploy. You'll get a URL like `https://civicmind-backend.onrender.com`
+
+### Vercel (Frontend)
+
+1. Edit `frontend/vercel.json` and replace `REPLACE_ME_WITH_YOUR_RENDER_URL` with your actual Render URL
+2. Import the repo into Vercel, set the root directory to `frontend/`
+3. Deploy
+
+Vercel rewrites proxy `/predict` and `/summarize` requests to the Render backend, so the browser sees same-origin requests.
+
+---
+
 ## Tech Stack
 
 | Component | Technology |
@@ -216,7 +263,9 @@ Analyzed by `scripts/transition_stats.py` which computes transition confidence, 
 | Graph | NetworkX |
 | Data | pandas, numpy |
 | ML Backend | PyTorch (CUDA-capable) |
-| Dashboard | FastAPI, Uvicorn |
+| Dashboard | FastAPI, Uvicorn, HTML/JS |
+| LLM Summaries | google-genai (Gemini 2.0 Flash Lite) |
+| Config | python-dotenv, .env |
 
 ---
 
@@ -225,7 +274,7 @@ Analyzed by `scripts/transition_stats.py` which computes transition confidence, 
 Fully functional retrieval and inference pipeline. Next steps:
 
 - [x] Web dashboard (FastAPI + HTML/JS) for interactive situation input
-- [ ] LLM summary layer on top of the reasoning trace
+- [x] LLM summary layer (Gemini 2.0 Flash Lite) with error handling
 - [x] Consolidation loop: increment retrieval_count, update confidence_score after each inference
 - [ ] Real city data integration
 - [ ] Cross-validation of fusion weights (0.5/0.3/0.2)
