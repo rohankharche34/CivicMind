@@ -5,3 +5,9 @@ __pycache__/
 __pycache__/*
 
 *.~lock.*
+
+# redundant standalone demo, logic duplicated in engine/inference.py
+memory/retrieve_memories.py
+
+# runtime learning state — delete to reset
+dataset/learning_state.json
